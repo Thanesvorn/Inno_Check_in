@@ -1,1 +1,363 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ลงทะเบียน LINE Check-in</title>
+  <script src="https://static.line-scdn.net/liff/edge/versions/2.22.3/sdk.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Sarabun', Arial, sans-serif;
+      background: #f0f4f8;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      min-height: 100vh;
+      padding: 24px 16px;
+    }
+    .card {
+      background: white;
+      border-radius: 16px;
+      padding: 28px 24px;
+      width: 100%;
+      max-width: 380px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    }
+    .header { text-align: center; margin-bottom: 24px; }
+    .logo { font-size: 44px; margin-bottom: 6px; }
+    h1 { font-size: 20px; color: #1a1a2e; margin-bottom: 4px; }
+    .subtitle { font-size: 13px; color: #888; line-height: 1.5; }
 
+    /* Step indicator */
+    .steps {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 24px;
+    }
+    .step-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: #ddd;
+      transition: background 0.3s;
+    }
+    .step-dot.active { background: #06C755; }
+    .step-dot.done { background: #06C755; opacity: 0.4; }
+    .step-line { width: 32px; height: 2px; background: #ddd; }
+    .step-line.done { background: #06C755; opacity: 0.4; }
+
+    /* Form */
+    label { display: block; font-size: 13px; color: #555; margin-bottom: 6px; font-weight: 600; }
+    input[type="text"] {
+      width: 100%;
+      padding: 13px 16px;
+      border: 2px solid #e0e0e0;
+      border-radius: 10px;
+      font-size: 16px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    input[type="text"]:focus { border-color: #06C755; }
+
+    /* Employee card */
+    .emp-card {
+      border: 2px solid #06C755;
+      border-radius: 12px;
+      padding: 16px;
+      margin: 16px 0;
+      background: #f0fdf4;
+    }
+    .emp-name { font-size: 18px; font-weight: 700; color: #1a1a2e; margin-bottom: 4px; }
+    .emp-nick { font-size: 13px; color: #06C755; font-weight: 600; margin-bottom: 12px; }
+    .emp-detail { display: flex; justify-content: space-between; margin-bottom: 6px; }
+    .emp-label { font-size: 12px; color: #888; }
+    .emp-value { font-size: 13px; color: #333; font-weight: 600; text-align: right; max-width: 60%; }
+
+    /* Multiple results */
+    .emp-list-item {
+      border: 2px solid #e0e0e0;
+      border-radius: 10px;
+      padding: 14px 16px;
+      margin-bottom: 10px;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .emp-list-item:hover { border-color: #06C755; background: #f0fdf4; }
+    .emp-list-item.selected { border-color: #06C755; background: #f0fdf4; }
+    .emp-list-name { font-size: 15px; font-weight: 700; color: #1a1a2e; }
+    .emp-list-sub { font-size: 12px; color: #888; margin-top: 2px; }
+    .emp-list-check { font-size: 20px; display: none; }
+    .emp-list-item.selected .emp-list-check { display: block; }
+
+    /* Warning box */
+    .warning-box {
+      background: #fff8e1;
+      border: 1.5px solid #ffc107;
+      border-radius: 10px;
+      padding: 14px;
+      margin: 16px 0;
+      font-size: 13px;
+      color: #5d4037;
+      line-height: 1.6;
+    }
+    .warning-box .warn-title {
+      font-weight: 700;
+      color: #e65100;
+      margin-bottom: 6px;
+      font-size: 14px;
+    }
+
+    /* Buttons */
+    .btn {
+      width: 100%;
+      padding: 14px;
+      border: none;
+      border-radius: 10px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-top: 8px;
+    }
+    .btn-green { background: #06C755; color: white; }
+    .btn-green:hover { background: #05a847; }
+    .btn-green:disabled { background: #bbb; cursor: not-allowed; }
+    .btn-outline { background: white; color: #666; border: 2px solid #ddd; }
+    .btn-outline:hover { border-color: #aaa; }
+    .btn-red { background: #d32f2f; color: white; }
+    .btn-red:hover { background: #b71c1c; }
+
+    /* Status */
+    .status {
+      padding: 12px 16px;
+      border-radius: 10px;
+      font-size: 13px;
+      line-height: 1.5;
+      margin-top: 12px;
+      display: none;
+    }
+    .status.loading { background: #fff3cd; color: #856404; display: block; }
+    .status.success { background: #d1e7dd; color: #0f5132; display: block; }
+    .status.error   { background: #f8d7da; color: #842029; display: block; }
+
+    /* Sections */
+    .section { display: none; }
+    .section.active { display: block; }
+  </style>
+</head>
+<body>
+<div class="card">
+  <div class="header">
+    <div class="logo">📋</div>
+    <h1>ลงทะเบียน Check-in</h1>
+    <p class="subtitle">เชื่อมต่อบัญชี LINE กับข้อมูลพนักงาน</p>
+  </div>
+
+  <!-- Step indicator -->
+  <div class="steps">
+    <div class="step-dot active" id="dot1"></div>
+    <div class="step-line" id="line1"></div>
+    <div class="step-dot" id="dot2"></div>
+    <div class="step-line" id="line2"></div>
+    <div class="step-dot" id="dot3"></div>
+  </div>
+
+  <!-- Step 1: ค้นหาชื่อ -->
+  <div class="section active" id="step1">
+    <label for="nameInput">ชื่อจริง (ภาษาไทย)</label>
+    <input type="text" id="nameInput" placeholder="เช่น ธเนศวร" autocomplete="off">
+    <div class="status" id="status1"></div>
+    <button class="btn btn-green" id="searchBtn" onclick="searchEmployee()" style="margin-top:16px">
+      🔍 ค้นหา
+    </button>
+  </div>
+
+  <!-- Step 2: ยืนยันตัวตน -->
+  <div class="section" id="step2">
+    <p style="font-size:13px; color:#555; margin-bottom:12px;">
+      พบข้อมูลต่อไปนี้ — <strong>เลือกชื่อของคุณ</strong>
+    </p>
+    <div id="empList"></div>
+    <div class="status" id="status2"></div>
+    <button class="btn btn-green" id="confirmSelectBtn" onclick="goToStep3()" disabled>
+      ✅ นี่คือฉัน ถัดไป →
+    </button>
+    <button class="btn btn-outline" onclick="backToStep1()" style="margin-top:6px">
+      ← ค้นหาใหม่
+    </button>
+  </div>
+
+  <!-- Step 3: ยืนยันการลงทะเบียน -->
+  <div class="section" id="step3">
+    <p style="font-size:13px; color:#555; margin-bottom:4px;">ตรวจสอบข้อมูลของคุณ</p>
+    <div class="emp-card" id="finalCard"></div>
+
+    <div class="warning-box">
+      <div class="warn-title">⚠️ กรุณาอ่านก่อนยืนยัน</div>
+      การลงทะเบียนนี้จะเชื่อมต่อบัญชี LINE ของคุณกับข้อมูลพนักงานข้างต้น<br><br>
+      <strong>ข้อมูลจะถูกบันทึกถาวรและมีผลต่อการนับวันขาด ลา มาสาย</strong> โดยตรง<br><br>
+      หากข้อมูลไม่ถูกต้อง ต้องติดต่อ HR เพื่อแก้ไขเท่านั้น
+    </div>
+
+    <div class="status" id="status3"></div>
+    <button class="btn btn-red" onclick="confirmRegistration()">
+      🔒 ยืนยัน — ข้อมูลถูกต้องแล้ว
+    </button>
+    <button class="btn btn-outline" onclick="backToStep2()" style="margin-top:6px">
+      ← ย้อนกลับ
+    </button>
+  </div>
+</div>
+
+<script>
+  const LIFF_ID        = "2010361815-48uZswXE";
+  const SEARCH_WEBHOOK = "https://hook.us2.make.com/ece7882urwxm4ca0k0a6pw8gtgy24svq";
+  const CONFIRM_WEBHOOK= "https://hook.us2.make.com/zttpofjtpci1dl6fohug305trxu622x2";
+
+  let userId = "";
+  let selectedEmp = null;
+
+  // Init LIFF
+  liff.init({ liffId: LIFF_ID })
+    .then(() => {
+      if (!liff.isInClient()) {
+        document.getElementById("status1").className = "status error";
+        document.getElementById("status1").style.display = "block";
+        document.getElementById("status1").textContent = "❌ กรุณาเปิดผ่านแอป LINE เท่านั้น";
+        document.getElementById("searchBtn").disabled = true;
+        return;
+      }
+      return liff.getProfile();
+    })
+    .then(profile => { if (profile) userId = profile.userId; })
+    .catch(err => console.error(err));
+
+  // Step indicators
+  function setStep(n) {
+    ["dot1","dot2","dot3"].forEach((id,i) => {
+      const el = document.getElementById(id);
+      el.className = "step-dot" + (i+1 < n ? " done" : i+1 === n ? " active" : "");
+    });
+    ["line1","line2"].forEach((id,i) => {
+      document.getElementById(id).className = "step-line" + (i+1 < n ? " done" : "");
+    });
+    ["step1","step2","step3"].forEach((id,i) => {
+      document.getElementById(id).className = "section" + (i+1 === n ? " active" : "");
+    });
+  }
+
+  function showStatus(id, type, msg) {
+    const el = document.getElementById(id);
+    el.className = "status " + type;
+    el.textContent = msg;
+  }
+
+  // === STEP 1: ค้นหา ===
+  async function searchEmployee() {
+    const name = document.getElementById("nameInput").value.trim();
+    if (!name) { showStatus("status1","error","⚠️ กรุณากรอกชื่อ"); return; }
+    if (!userId) { showStatus("status1","error","❌ ไม่พบ LINE User ID"); return; }
+
+    document.getElementById("searchBtn").disabled = true;
+    showStatus("status1","loading","⏳ กำลังค้นหา...");
+
+    try {
+      const res = await fetch(SEARCH_WEBHOOK, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: name })
+      });
+      const data = await res.json();
+
+      if (!data.found || data.employees.length === 0) {
+        showStatus("status1","error","❌ ไม่พบชื่อ \"" + name + "\" กรุณาตรวจสอบการสะกด หรือติดต่อ HR");
+        document.getElementById("searchBtn").disabled = false;
+        return;
+      }
+
+      renderEmpList(data.employees);
+      setStep(2);
+
+    } catch (err) {
+      showStatus("status1","error","❌ เกิดข้อผิดพลาด กรุณาลองใหม่");
+      document.getElementById("searchBtn").disabled = false;
+    }
+  }
+
+  function renderEmpList(employees) {
+    const list = document.getElementById("empList");
+    list.innerHTML = "";
+    employees.forEach((emp, i) => {
+      const div = document.createElement("div");
+      div.className = "emp-list-item";
+      div.innerHTML = `
+        <div>
+          <div class="emp-list-name">${emp.nameTH} ${emp.surnameTH}</div>
+          <div class="emp-list-sub">${emp.position} • ${emp.department}</div>
+        </div>
+        <div class="emp-list-check">✅</div>
+      `;
+      div.onclick = () => selectEmp(div, emp);
+      list.appendChild(div);
+    });
+  }
+
+  function selectEmp(el, emp) {
+    document.querySelectorAll(".emp-list-item").forEach(e => e.classList.remove("selected"));
+    el.classList.add("selected");
+    selectedEmp = emp;
+    document.getElementById("confirmSelectBtn").disabled = false;
+  }
+
+  // === STEP 2 → 3 ===
+  function goToStep3() {
+    if (!selectedEmp) return;
+    // Render final card
+    document.getElementById("finalCard").innerHTML = `
+      <div class="emp-name">${selectedEmp.nameTH} ${selectedEmp.surnameTH}</div>
+      <div class="emp-nick">ชื่อเล่น: ${selectedEmp.nickname || "-"}</div>
+      <div class="emp-detail"><span class="emp-label">รหัสพนักงาน</span><span class="emp-value">${selectedEmp.empId}</span></div>
+      <div class="emp-detail"><span class="emp-label">แผนก</span><span class="emp-value">${selectedEmp.department}</span></div>
+      <div class="emp-detail"><span class="emp-label">ตำแหน่ง</span><span class="emp-value">${selectedEmp.position}</span></div>
+    `;
+    setStep(3);
+  }
+
+  // === STEP 3: ยืนยัน ===
+  async function confirmRegistration() {
+    if (!selectedEmp || !userId) return;
+
+    document.querySelectorAll(".btn").forEach(b => b.disabled = true);
+    showStatus("status3","loading","⏳ กำลังบันทึกข้อมูล...");
+
+    try {
+      await fetch(CONFIRM_WEBHOOK, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: userId, empId: selectedEmp.empId })
+      });
+      showStatus("status3","success","✅ ลงทะเบียนสำเร็จ! รอรับข้อความยืนยันจาก LINE");
+      setTimeout(() => liff.closeWindow(), 3000);
+    } catch (err) {
+      showStatus("status3","error","❌ เกิดข้อผิดพลาด กรุณาลองใหม่");
+      document.querySelectorAll(".btn").forEach(b => b.disabled = false);
+    }
+  }
+
+  // === Back buttons ===
+  function backToStep1() {
+    selectedEmp = null;
+    document.getElementById("confirmSelectBtn").disabled = true;
+    document.getElementById("searchBtn").disabled = false;
+    document.getElementById("status1").className = "status";
+    setStep(1);
+  }
+  function backToStep2() { setStep(2); }
+</script>
+</body>
+</html>
