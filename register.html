@@ -216,6 +216,7 @@
 
 <script>
   const LIFF_ID        = "2010361815-48uZswXE";
+  const CHECK_WEBHOOK  = "https://hook.us2.make.com/2f81sgkyaa0ogdkha2p4kdgb3dp85nc5";
   const SEARCH_WEBHOOK = "https://hook.us2.make.com/ece7882urwxm4ca0k0a6pw8gtgy24svq";
   const CONFIRM_WEBHOOK= "https://hook.us2.make.com/zttpofjtpci1dl6fohug305trxu622x2";
 
@@ -234,7 +235,23 @@
       }
       return liff.getProfile();
     })
-    .then(profile => { if (profile) userId = profile.userId; })
+    .then(async profile => {
+      if (profile) {
+        userId = profile.userId;
+        try {
+          const res = await fetch(CHECK_WEBHOOK, {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({ userId: userId })
+          });
+          const data = await res.json();
+          if (data.registered) {
+            showStatus("status1", "error", "⚠️ คุณได้ลงทะเบียนไว้แล้ว หากต้องการแก้ไขกรุณาติดต่อ HR");
+            document.getElementById("searchBtn").disabled = true;
+          }
+        } catch(e) { console.error(e); }
+      }
+    })
     .catch(err => console.error(err));
 
   // Step indicators
