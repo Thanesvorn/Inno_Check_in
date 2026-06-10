@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>INNO Check-in</title>
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <style>
+    body { font-family: sans-serif; text-align: center; padding: 40px 20px; background: #f0f4f8; }
+    button { background: #06C755; color: white; border: none; padding: 16px 40px;
+             font-size: 18px; border-radius: 12px; cursor: pointer; margin-top: 20px; }
+    #status { margin-top: 20px; font-size: 16px; }
+  </style>
+</head>
+<body>
+  <h2>📍 INNO Check-in</h2>
+  <p>กดปุ่มเพื่อเช็คอินด้วยตำแหน่งจริง</p>
+  <button onclick="doCheckIn()">เช็คอินเลย</button>
+  <div id="status"></div>
+
+<script>
+const LIFF_ID = "YOUR_LIFF_ID";           // ← ใส่ LIFF ID ของคุณ
+const WEBHOOK = "YOUR_MAKE_WEBHOOK_URL";  // ← ใส่ Make.com Webhook URL
+
+async function doCheckIn() {
+  const status = document.getElementById("status");
+  status.textContent = "⏳ กำลังดึงตำแหน่ง...";
+
+  try {
+    await liff.init({ liffId: LIFF_ID });
+    const profile = await liff.getProfile();
+
+    navigator.geolocation.getCurrentPosition(async (pos) => {
+      const payload = {
+        userId:    profile.userId,
+        latitude:  pos.coords.latitude,
+        longitude: pos.coords.longitude,
+        accuracy:  pos.coords.accuracy,
+        timestamp: new Date().toISOString()
+      };
+
+      await fetch(WEBHOOK, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      status.textContent = "✅ ส่งข้อมูลแล้ว รอรับข้อความจาก LINE";
+      setTimeout(() => liff.closeWindow(), 2000);
+
+    }, (err) => {
+      status.textContent = "❌ ไม่สามารถดึง GPS ได้: " + err.message;
+    }, { enableHighAccuracy: true, timeout: 10000 });
+
+  } catch (e) {
+    status.textContent = "❌ Error: " + e.message;
+  }
+}
+</script>
+</body>
+</html>
