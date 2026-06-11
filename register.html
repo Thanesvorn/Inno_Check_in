@@ -353,13 +353,18 @@
     showStatus("status3","loading","⏳ กำลังบันทึกข้อมูล...");
 
     try {
-      await fetch(CONFIRM_WEBHOOK, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: userId, empId: selectedEmp.empId })
-      });
-      showStatus("status3","success","✅ ลงทะเบียนสำเร็จ! รอรับข้อความยืนยันจาก LINE");
-      setTimeout(() => liff.closeWindow(), 3000);
+const res = await fetch(CONFIRM_WEBHOOK, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ userId: userId, empId: selectedEmp.empId })
+});
+const data = await res.json();
+if (data.success) {
+  showStatus("status3","success","✅ ลงทะเบียนสำเร็จ! รอรับข้อความยืนยันจาก LINE");
+  setTimeout(() => liff.closeWindow(), 3000);
+} else {
+  throw new Error("failed");
+}
     } catch (err) {
       showStatus("status3","error","❌ เกิดข้อผิดพลาด กรุณาลองใหม่");
       document.querySelectorAll(".btn").forEach(b => b.disabled = false);
